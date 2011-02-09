@@ -2,10 +2,7 @@ import os
 import sys
 from setuptools import setup, find_packages
 
-import ez_setup
-ez_setup.use_setuptools()
-
-version = "1.0"
+version = '1.0'
 
 dependencies = ['wxPython>=2.8']
 
@@ -38,4 +35,14 @@ setup(name='fennecpt',
       install_requires=dependencies,
       **extra_options
 )
-      
+ 
+if sys.platform == 'win32':
+    archive_name = 'fennecpt-%s.zip' % version
+    print ''
+    print 'Creating archive "%s"...' % archive_name
+    import zipfile
+    z = zipfile.ZipFile(archive_name, 'w')
+    for f in os.listdir('dist'):
+        z.write(os.path.join('dist', f), os.path.join('fennecpt', f))
+    z.close()
+
