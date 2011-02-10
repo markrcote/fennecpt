@@ -8,10 +8,16 @@ dependencies = ['wxPython>=2.8']
 
 if sys.platform == 'win32':
     import py2exe
+    sys.path.append('fennecpt')
     extra_options = dict(
         setup_requires=['py2exe'],
         #app=['fennecpt/fennecpt.py'],
-        console=['fennecpt/fennecpt.py']
+        console=['fennecpt/fennecpt.py'],
+        options=dict(
+          py2exe=dict(
+            packages=['devicemanager']
+          )
+        )
     )
 else:
     extra_options = dict(
@@ -33,11 +39,12 @@ setup(name='fennecpt',
       url='http://people.mozilla.com/~fennecpt/',
       license='MPL 1.1/LGPL 2.1/GPL 2.0',
       install_requires=dependencies,
+      data_files=['README.txt'],
       **extra_options
 )
  
 if sys.platform == 'win32':
-    archive_name = 'fennecpt-%s.zip' % version
+    archive_name = 'fennecpt-%s-win32.zip' % version
     print ''
     print 'Creating archive "%s"...' % archive_name
     import zipfile
