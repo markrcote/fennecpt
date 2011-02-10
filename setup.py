@@ -11,7 +11,6 @@ if sys.platform == 'win32':
     sys.path.append('fennecpt')
     extra_options = dict(
         setup_requires=['py2exe'],
-        #app=['fennecpt/fennecpt.py'],
         console=['fennecpt/fennecpt.py'],
         options=dict(
           py2exe=dict(
