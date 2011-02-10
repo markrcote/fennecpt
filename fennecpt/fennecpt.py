@@ -139,6 +139,7 @@ class FennecProfileTool(object):
             try:
                 tag = file(local_tag_file, 'r').read().strip()
                 print 'got tag: %s' % tag
+                self.installed_profile = tag
             except IOError:
                 pass
         
