@@ -156,12 +156,14 @@ class FennecProfileTool(object):
                     tag = tag_base + '.%d' % i
             local_tag_path = os.path.join(local_dir, TAG_NAME)
             file(local_tag_path, 'w').write(tag + '\n')
-            self.dm.pushFile(local_tag_path, self.remote_profile_path() + '/' + TAG_NAME)
+            if not new_tag:
+                print 'uploading tag'
+                self.dm.pushFile(local_tag_path, self.remote_profile_path() + '/' + TAG_NAME)
+                self.installed_profile = tag
         local_profile_path = os.path.join(self.local_profile_dir, tag)
         if os.path.exists(local_profile_path):
             shutil.rmtree(local_profile_path)
         os.rename(local_dir, local_profile_path)
-        self.installed_profile = tag
         self.clear_status()
 
     def switch_profile(self, local_profile_name, replace_tag='', no_copy=False):
@@ -235,6 +237,9 @@ class WorkerThread(threading.Thread):
             elif event[0] == 'delete_profile':
                 local_profile_name = event[1]
                 self.fpm.delete_profile(local_profile_name)
+            elif event[0] == 'download_profile':
+                replace_tag = event[1]
+                self.fpm.get_profile(replace_tag)
         self.dm = None
     
     def open_connection(self, args):
@@ -478,6 +483,7 @@ class FPMFrame(wx.Frame):
     STATE_IDLE = 1
     STATE_LAUNCH_CHECK_PROFILES = 2
     STATE_LAUNCH_CHECK_RUNNING = 3
+    STATE_DOWNLOAD_CHECK_PROFILES = 4
     
     def __init__(self, *args, **kwds):
         kwds["style"] = wx.DEFAULT_FRAME_STYLE
@@ -499,9 +505,11 @@ class FPMFrame(wx.Frame):
         self.Bind(wx.EVT_LISTBOX, self.select_profile, self.list_box_profiles)
         self.Bind(wx.EVT_LISTBOX_DCLICK, self.launch_fennec, self.list_box_profiles)
         wx.EVT_KEY_UP(self.list_box_profiles, self.profile_list_key_up)
+        self.button_download = wx.Button(self.panel, -1, "Download profile")
         self.button_launch = wx.Button(self.panel, -1, "Launch Fennec")
         self.select_profile()
         self.Bind(wx.EVT_BUTTON, self.launch_fennec, self.button_launch)
+        self.Bind(wx.EVT_BUTTON, self.download_profile, self.button_download)
         EVT_FPM(self, self.fpm_event)
 
         self.state = self.STATE_IDLE
@@ -511,6 +519,7 @@ class FPMFrame(wx.Frame):
         self.__set_properties()
         self.__do_layout()
         self.profile_map = {}
+        self.disable_ui()
 
     def __set_properties(self):
         self.SetTitle("Fennec Profile Tool")
@@ -524,7 +533,10 @@ class FPMFrame(wx.Frame):
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(self.label_profile_list, 0, wx.LEFT|wx.TOP|wx.EXPAND, 10)
         sizer.Add(self.list_box_profiles, 100, wx.ALL|wx.EXPAND, 10)
-        sizer.Add(self.button_launch, 0, wx.LEFT|wx.RIGHT|wx.BOTTOM|wx.ALIGN_RIGHT, 10)
+        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        sizer.Add(button_sizer, 0, wx.ALIGN_RIGHT)
+        button_sizer.Add(self.button_download, 0, wx.RIGHT|wx.BOTTOM|wx.ALIGN_RIGHT, 10)
+        button_sizer.Add(self.button_launch, 0, wx.RIGHT|wx.BOTTOM|wx.ALIGN_RIGHT, 10)
         self.panel.SetSizer(sizer)
         self.panel.Layout()
 
@@ -555,6 +567,8 @@ class FPMFrame(wx.Frame):
                 self.list_box_profiles.Set(selections)
             elif self.state == self.STATE_LAUNCH_CHECK_PROFILES:
                 self.launch_fennec_check_profile(installed_profile, profiles)
+            elif self.state == self.STATE_DOWNLOAD_CHECK_PROFILES:
+                self.download_profile_check_profile(installed_profile, profiles)
         elif event.event_type == 'fennec_running':
             fennec_running = event.data[0]
             if self.state == self.STATE_LAUNCH_CHECK_RUNNING:
@@ -565,10 +579,12 @@ class FPMFrame(wx.Frame):
 
     def disable_ui(self):
         self.list_box_profiles.Disable()
+        self.button_download.Disable()
         self.button_launch.Disable()
     
     def enable_ui(self):
         self.list_box_profiles.Enable()
+        self.button_download.Enable()
         self.enable_launch_if_selection()
 
     def set_status(self, msg, field=1):
@@ -608,19 +624,21 @@ class FPMFrame(wx.Frame):
             self.queue.put(('delete_profile', selected_profile))
             self.queue.put(('get_profiles',))
 
-    def launch_fennec_check_profile(self, installed_profile, profiles):
+    def check_profile(self, installed_profile, profiles, allow_no_copy=True):
         newtag = ''
         no_copy = False
         overwrite = False
         if installed_profile in profiles:
             while not (newtag or no_copy or overwrite):
+                choices = ['Overwrite the current profile?', 'Copy the profile locally under a new name?']
+                if allow_no_copy:
+                    choices.append('Don\'t copy it locally?')
                 dlg = RadioChoiceDialog(None, 'The profile "%s" exists on the local machine.  Do you want to...' % installed_profile,
-                    'Profile exists', ['Overwrite the current profile?', 'Copy the profile locally under a new name?',
-                                       'Don\'t copy it locally?'])
+                    'Profile exists', choices)
                 result = dlg.ShowModal()
                 if result == wx.ID_CANCEL:
                     dlg.Destroy()
-                    return
+                    return None, False
                 choice = dlg.GetSelection()
                 if choice == 0:
                     newtag = ''
@@ -639,6 +657,24 @@ class FPMFrame(wx.Frame):
                 elif choice == 2:
                     no_copy = True
                 dlg.Destroy()
+        return newtag, no_copy
+
+    def download_profile_check_profile(self, installed_profile, profiles):
+        newtag, no_copy = self.check_profile(installed_profile, profiles, False)
+        if newtag == None:
+            return
+        self.queue.put(('download_profile', newtag))
+        self.state = self.STATE_IDLE
+        self.queue.put(('get_profiles',))
+
+    def download_profile(self, event):
+        self.state = self.STATE_DOWNLOAD_CHECK_PROFILES
+        self.queue.put(('get_profiles',))
+
+    def launch_fennec_check_profile(self, installed_profile, profiles):
+        newtag, no_copy = self.check_profile(installed_profile, profiles)
+        if newtag == None:
+            return
         selected_profile = self.profile_map[self.list_box_profiles.GetSelection()]
         self.set_status('Launching fennec...')
         self.queue.put(('launch_fennec_with_profile', selected_profile, newtag, no_copy))
