@@ -6,7 +6,9 @@ Mozilla SUTAgent.  There is no easy way to use more than one profile in
 Fennec, so FennecPT keeps profiles on a local machine and transfers them
 back and forth to the mobile device as required.
 
-FennecPT is available, for now, at http://people.mozilla.com/~mcote/fennecpt/
+The FennecPT home page is, for now, http://people.mozilla.com/~mcote/fennecpt/
+Code is available on github: https://github.com/markrcote/fennecpt
+However it will probably move a Mozilla Mercurial repository at some point.
 
 
 Installation
@@ -14,20 +16,15 @@ Installation
 
 FennecPT is written in Python and uses the wxPython libraries for GUI aspects.
 
-NOTE: This is currently just a prototype.  There is no pretty installer yet,
-though there certainly will be in the future.  For now, you can get the raw
-Python files (Python 2.6+ and wxPython 2.8+ required), which should work
-on any modern Linux or OS X system, or get the MS Windows archive, which
-contains an executable and all necessary Python libraries (packaged by
-py2exe).
-
 Linux instructions:
-  Nothing special, just run "./fennecpt.py".
+  You can run the source directly: "./fennecpt.py".  You can also install
+  the egg with setuptools.  There is only a Python 2.6 egg at the moment:
+  "easy_install fennecpt-<version>-py2.6.egg".
   
 Mac OS X instructions:
-  Owing to some weirdness vis-a-vis 64-bit Python and the wxPython libraries,
-  run the shell script "./fennecpt.mac.sh", which forces the use of 32-bit
-  Python.
+  Owing to some weirdness vis-a-vis 64-bit Python and the wxPython
+  libraries, you will need to run the shell script "./fennecpt.mac.sh" from
+  the source, which forces the use of 32-bit Python.
  
 Windows instructions:
   The Windows package was created with py2exe, which packages up all the
@@ -104,3 +101,33 @@ You can try adding more bookmarks and launching the default profile,
 choosing "Overwrite the current profile", so the next time you
 launch Fennec with the "new bookmark" profile, all the bookmarks
 will be visible.
+
+
+Building
+--------
+
+To build on any system, you will need Python, wxPython, and setuptools.
+
+Linux:
+  Just run "python setup.py bdist_egg" to create a distributable egg.
+
+Windows:
+  You will also need py2exe installed and the Visual C++ 2008
+  Redistributable Package (see installation instructions above).  You will
+  need to copy a DLL, msvcp90.dll, into the main fennecpt directory.  A
+  script is provided in the utils/ directory to help this; pass it the
+  location of your Python executable:
+
+    utils\getvcdll.py C:\Python27\python.exe
+
+  At this point, you should be able to build with the command
+
+    python setup.py py2exe
+
+  A zipfile will be created named fennecpt-<version>.zip.
+
+MacOS
+  Sadly I have not been able to create a proper build for Mac, owing to
+  difficulties with wxPython.  My experiments with setuptools and py2applet
+  were dismal failures.  If anyone knows how to create Mac packages of
+  python applications that use wx, please let me know: mcote@mozilla.com.
